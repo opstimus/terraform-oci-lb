@@ -8,14 +8,9 @@ output "load_balancer_ip_addresses" {
   value       = oci_load_balancer_load_balancer.main.ip_address_details
 }
 
-output "public_ip_id" {
-  description = "The OCID of the reserved public IP. Null when the load balancer is private."
-  value       = one(oci_core_public_ip.main[*].id)
-}
-
 output "public_ip_address" {
-  description = "The reserved public IP address. Null when the load balancer is private."
-  value       = one(oci_core_public_ip.main[*].ip_address)
+  description = "The public IP address assigned to the load balancer by OCI. Null when the load balancer is private."
+  value       = var.is_private == true ? null : one([for ip in oci_load_balancer_load_balancer.main.ip_address_details : ip.ip_address if ip.is_public == true])
 }
 
 output "nsg_id" {

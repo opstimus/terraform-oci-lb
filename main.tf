@@ -41,15 +41,6 @@ resource "oci_core_network_security_group_security_rule" "lb_egress" {
   destination_type          = "CIDR_BLOCK"
 }
 
-resource "oci_core_public_ip" "main" {
-  count          = var.is_private == true ? 0 : 1
-  compartment_id = var.compartment_id
-  lifetime       = "RESERVED"
-  display_name   = "${var.project}-${var.environment}-lb"
-  freeform_tags  = var.tags
-}
-
-
 resource "oci_load_balancer_load_balancer" "main" {
   compartment_id               = var.compartment_id
   display_name                 = "${var.project}-${var.environment}-${var.is_private == true ? "private" : "public"}-lb"
@@ -62,13 +53,7 @@ resource "oci_load_balancer_load_balancer" "main" {
   network_security_group_ids   = [oci_core_network_security_group.main.id]
   is_request_id_enabled        = var.is_request_id_enabled
   request_id_header            = var.is_request_id_enabled == true ? "X-Request-ID" : null
-  dynamic "reserved_ips" {
-    for_each = oci_core_public_ip.main[*].id
-    content {
-      id = reserved_ips.value
-    }
-  }
-  security_attributes = var.security_attributes
+  security_attributes          = var.security_attributes
   shape_details {
     maximum_bandwidth_in_mbps = var.maximum_bandwidth_in_mbps
     minimum_bandwidth_in_mbps = var.minimum_bandwidth_in_mbps
@@ -90,7 +75,7 @@ resource "oci_load_balancer_backend_set" "http" {
 
 resource "oci_load_balancer_backend_set" "https" {
   health_checker {
-    protocol    = "HTTPS"
+    protocol    = "HTTP"
     url_path    = var.health_check_url_path
     port        = var.health_check_port
     return_code = 200
@@ -114,22 +99,29 @@ resource "oci_load_balancer_listener" "https" {
   load_balancer_id         = oci_load_balancer_load_balancer.main.id
   name                     = "${var.project}-${var.environment}-https-listener"
   port                     = 443
-  protocol                 = "HTTPS"
+  protocol                 = "HTTP"
 
   connection_configuration {
     idle_timeout_in_seconds = var.listener_connection_configuration_idle_timeout_in_seconds
   }
   ssl_configuration {
-    certificate_ids        = var.listener_ssl_configuration_certificate_ids
-    has_session_resumption = true
-    cipher_suite_name      = "oci-default-ssl-cipher-suite-v1"
-    protocols              = ["TLSv1.2"]
+    certificate_ids          = var.listener_ssl_configuration_certificate_ids
+    has_session_resumption   = true
+    cipher_suite_name        = "oci-default-ssl-cipher-suite-v1"
+    protocols                = ["TLSv1.2"]
+    verify_peer_certificate  = false
   }
 }
 
 resource "oci_load_balancer_rule_set" "http_redirect" {
   items {
     action = "REDIRECT"
+
+    conditions {
+      attribute_name  = "PATH"
+      attribute_value = "/"
+      operator        = "FORCE_LONGEST_PREFIX_MATCH"
+    }
 
     redirect_uri {
       host     = "{host}"
@@ -141,5 +133,5 @@ resource "oci_load_balancer_rule_set" "http_redirect" {
     response_code = 301
   }
   load_balancer_id = oci_load_balancer_load_balancer.main.id
-  name             = "${var.project}-${var.environment}-https-redirect"
+  name             = replace("${var.project}_${var.environment}_https_redirect", "-", "_")
 }

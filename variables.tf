@@ -72,7 +72,7 @@ variable "health_check_url_path" {
 variable "health_check_port" {
   description = "The port on the backend to use for health checks."
   type        = number
-  default     = 443
+  default     = 80
 }
 
 variable "listener_connection_configuration_idle_timeout_in_seconds" {
