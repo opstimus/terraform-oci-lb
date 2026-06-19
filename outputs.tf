@@ -27,3 +27,8 @@ output "https_backend_set_name" {
   description = "The name of the HTTPS backend set."
   value       = oci_load_balancer_backend_set.https.name
 }
+
+output "routing_policy_name" {
+  description = "The name of Routing policy"
+  value       = oci_load_balancer_load_balancer_routing_policy.main.name
+}

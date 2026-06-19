@@ -60,6 +60,27 @@ resource "oci_load_balancer_load_balancer" "main" {
   }
 }
 
+resource "oci_load_balancer_load_balancer_routing_policy" "main" {
+  load_balancer_id           = oci_load_balancer_load_balancer.main.id
+  name                       = "main_routing"
+  condition_language_version = "V1"
+
+  # Required to satisfy OCI's "at least one rule" constraint at create time.
+  # Microservices will overwrite this list via the upsert script.
+  rules {
+    name      = "default_placeholder"
+    condition = "http.request.url.path sw '/__placeholder__'"
+    actions {
+      name             = "FORWARD_TO_BACKENDSET"
+      backend_set_name = oci_load_balancer_backend_set.https.name
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [rules]
+  }
+}
+
 
 resource "oci_load_balancer_backend_set" "http" {
   health_checker {
@@ -100,16 +121,17 @@ resource "oci_load_balancer_listener" "https" {
   name                     = "${var.project}-${var.environment}-https-listener"
   port                     = 443
   protocol                 = "HTTP"
+  routing_policy_name      = oci_load_balancer_load_balancer_routing_policy.main.name
 
   connection_configuration {
     idle_timeout_in_seconds = var.listener_connection_configuration_idle_timeout_in_seconds
   }
   ssl_configuration {
-    certificate_ids          = var.listener_ssl_configuration_certificate_ids
-    has_session_resumption   = true
-    cipher_suite_name        = "oci-default-ssl-cipher-suite-v1"
-    protocols                = ["TLSv1.2"]
-    verify_peer_certificate  = false
+    certificate_ids         = var.listener_ssl_configuration_certificate_ids
+    has_session_resumption  = true
+    cipher_suite_name       = "oci-default-ssl-cipher-suite-v1"
+    protocols               = ["TLSv1.2"]
+    verify_peer_certificate = false
   }
 }
 
